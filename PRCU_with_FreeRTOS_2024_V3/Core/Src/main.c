@@ -41,10 +41,13 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-/* Definitions for blink01 */
-osThreadId_t blink01Handle;
-const osThreadAttr_t blink01_attributes = {
-  .name = "blink01",
+ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc2;
+
+/* Definitions for task_read_senso */
+osThreadId_t task_read_sensoHandle;
+const osThreadAttr_t task_read_senso_attributes = {
+  .name = "task_read_senso",
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
@@ -57,12 +60,18 @@ const osThreadAttr_t blink02_attributes = {
 };
 /* USER CODE BEGIN PV */
 
+// Define ADC variables
+int high_pressure; // high pressure sensor reading (Bar)
+int low_pressure; // low pressure sensor reading (mBar)
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-void StartBlink01(void *argument);
+static void MX_ADC1_Init(void);
+static void MX_ADC2_Init(void);
+void Start_task_read_sensors(void *argument);
 void StartBlink02(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -92,9 +101,6 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
-  // Calibrate ADCs
-  //HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED); // Calibrates ADC for low pressure sensor
-  //HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED); // Calibrates ADC for high pressure sensor
 
   /* USER CODE END Init */
 
@@ -107,7 +113,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_ADC1_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
+
+  // Calibrate ADCs
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED); // Calibrates ADC for low pressure sensor
+  HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED); // Calibrates ADC for high pressure sensor
 
   /* USER CODE END 2 */
 
@@ -131,8 +143,8 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of blink01 */
-  blink01Handle = osThreadNew(StartBlink01, NULL, &blink01_attributes);
+  /* creation of task_read_senso */
+  task_read_sensoHandle = osThreadNew(Start_task_read_sensors, NULL, &task_read_senso_attributes);
 
   /* creation of blink02 */
   blink02Handle = osThreadNew(StartBlink02, NULL, &blink02_attributes);
@@ -208,6 +220,133 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.GainCompensation = 0;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_12;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
+
+  /* USER CODE BEGIN ADC2_Init 0 */
+
+  /* USER CODE END ADC2_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC2_Init 1 */
+
+  /* USER CODE END ADC2_Init 1 */
+
+  /** Common config
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc2.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc2.Init.GainCompensation = 0;
+  hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc2.Init.LowPowerAutoWait = DISABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.NbrOfConversion = 1;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc2.Init.DMAContinuousRequests = DISABLE;
+  hadc2.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc2.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC2_Init 2 */
+
+  /* USER CODE END ADC2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -228,24 +367,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin|System_Ready_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : High_Pressure_ADC_Pin */
-  GPIO_InitStruct.Pin = High_Pressure_ADC_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(High_Pressure_ADC_GPIO_Port, &GPIO_InitStruct);
-
   /*Configure GPIO pin : Valve_Enable_Pin */
   GPIO_InitStruct.Pin = Valve_Enable_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Valve_Enable_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Low_Pressure_ADC_Pin */
-  GPIO_InitStruct.Pin = Low_Pressure_ADC_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(Low_Pressure_ADC_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PRS_Ready_Pin System_Ready_Pin */
   GPIO_InitStruct.Pin = PRS_Ready_Pin|System_Ready_Pin;
@@ -262,19 +389,35 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartBlink01 */
+/* USER CODE BEGIN Header_Start_task_read_sensors */
 /**
-  * @brief  Function implementing the blink01 thread.
+  * @brief  Function implementing the task_read_senso thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartBlink01 */
-void StartBlink01(void *argument)
+/* USER CODE END Header_Start_task_read_sensors */
+void Start_task_read_sensors(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   for(;;)
   {
+	  // Define ADC variables
+	  uint16_t high_pressure_raw; // High pressure ADC raw data (0 to 4095)
+	  int high_pressure_voltage; // High pressure ADC voltage reading (0 to VREF)
+
+	  // Read high pressure ADC
+	  HAL_ADC_Start(&hadc2); // Start the ADC
+	  HAL_ADC_PollForConversion(&hadc2, 1); // Wait for ADC to complete conversion
+	  high_pressure_raw = HAL_ADC_GetValue(&hadc2);
+	  high_pressure_voltage = (int) high_pressure_raw * 3300 / 4095; // Convert ADC reading to mV
+	  if (high_pressure_voltage <= 120 * 0.004 * 1000) {
+		  high_pressure = 0; // mBar
+	  		} else {
+	  			high_pressure = (high_pressure_voltage - 120 * 0.004 * 1000)* 250 / (120 * (0.02 - 0.004) * 1000); // Bar
+	  		}
+	  		//printf("High Pressure = %i Bar\r\n", (int) high_pressure);
+
 	  HAL_GPIO_TogglePin(GPIOB, PRS_Ready_Pin);
 	  osDelay(100);
 	  HAL_GPIO_TogglePin(GPIOB, PRS_Ready_Pin);
