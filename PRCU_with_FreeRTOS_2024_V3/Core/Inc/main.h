@@ -57,8 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define High_Pressure_ADC_Pin GPIO_PIN_5
+#define High_Pressure_ADC_GPIO_Port GPIOA
 #define Valve_Enable_Pin GPIO_PIN_6
 #define Valve_Enable_GPIO_Port GPIOA
+#define Low_Pressure_ADC_Pin GPIO_PIN_1
+#define Low_Pressure_ADC_GPIO_Port GPIOB
 #define PRS_Ready_Pin GPIO_PIN_6
 #define PRS_Ready_GPIO_Port GPIOB
 #define System_Ready_Pin GPIO_PIN_7
