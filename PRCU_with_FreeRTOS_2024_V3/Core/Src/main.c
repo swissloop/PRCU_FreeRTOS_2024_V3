@@ -156,7 +156,7 @@ int main(void)
   HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED); // Calibrates ADC for high pressure sensor
 
   // Pull SPI chip select line high
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, SPI2_CS_Pin, GPIO_PIN_SET);
 
   /* USER CODE END 2 */
 
@@ -439,10 +439,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Valve_Enable_GPIO_Port, Valve_Enable_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(Valve_Enable_GPIO_Port, Valve_Enable_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin|System_Ready_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, SPI2_CS_Pin|PRS_Ready_Pin|System_Ready_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : Valve_Enable_Pin */
   GPIO_InitStruct.Pin = Valve_Enable_Pin;
@@ -450,6 +450,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Valve_Enable_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI2_CS_Pin */
+  GPIO_InitStruct.Pin = SPI2_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI2_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PRS_Ready_Pin System_Ready_Pin */
   GPIO_InitStruct.Pin = PRS_Ready_Pin|System_Ready_Pin;
@@ -517,11 +524,11 @@ void Start_task_read_sensors(void *argument)
 	  // END Read low pressure ADC -------------------------------------------------------------------------------------------------
 
 	  // BEGIN Read pod pressure sensor (KP264 on PCB) -----------------------------------------------------------------------------
-	  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Pull SPI chip select line low to begin communication
+	  HAL_GPIO_WritePin(GPIOB, SPI2_CS_Pin, GPIO_PIN_RESET); // Pull SPI chip select line low to begin communication
 	  if (HAL_SPI_TransmitReceive(&hspi2, (uint8_t*) &request_pressure, (uint8_t*) &SPI_buffer, 1, 100) != HAL_OK) {
-		  pod_pressure = 111;
+		  pod_pressure = 22;
 	  }
-	  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Pull SPI chip select line high to end communication
+	  HAL_GPIO_WritePin(GPIOB, SPI2_CS_Pin, GPIO_PIN_SET); // Pull SPI chip select line high to end communication
 	  // Check if no errors were detected
 	  if ((SPI_buffer & no_error_mask) == no_error_mask) {
 		  // Get the pressure data using a bit mask and right shift operator to get rid of parity bit
