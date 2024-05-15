@@ -17,7 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
+#include "../Inc/main.h"
 #include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -44,7 +44,7 @@
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 
-/* Definitions for task_read_senso */
+/* Definitions for task_read_sensor */
 osThreadId_t task_read_sensoHandle;
 const osThreadAttr_t task_read_senso_attributes = {
   .name = "task_read_senso",
@@ -80,7 +80,15 @@ void StartBlink02(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int _write(int file, char *ptr, int len)
+ {
+	 int DataIdx;
+	 for (DataIdx = 0; DataIdx < len; DataIdx++)
+	 {
+		 ITM_SendChar(*ptr++);
+	 }
+	 return len;
+ }
 /* USER CODE END 0 */
 
 /**
@@ -405,18 +413,34 @@ void Start_task_read_sensors(void *argument)
 	  // Define ADC variables
 	  uint16_t high_pressure_raw; // High pressure ADC raw data (0 to 4095)
 	  int high_pressure_voltage; // High pressure ADC voltage reading (0 to VREF)
+	  uint16_t low_pressure_raw; // Low pressure ADC raw data (0 to 4095)
+	  int low_pressure_voltage; // Low pressure ADC voltage reading (0 to VREF)
 
 	  // Read high pressure ADC
 	  HAL_ADC_Start(&hadc2); // Start the ADC
 	  HAL_ADC_PollForConversion(&hadc2, 1); // Wait for ADC to complete conversion
-	  high_pressure_raw = HAL_ADC_GetValue(&hadc2);
+	  high_pressure_raw = HAL_ADC_GetValue(&hadc2); // Get value from ADC
+	  // Use mV instead of V to avoid using floats (because printf wouldn't let me use floats)
 	  high_pressure_voltage = (int) high_pressure_raw * 3300 / 4095; // Convert ADC reading to mV
-	  if (high_pressure_voltage <= 120 * 0.004 * 1000) {
-		  high_pressure = 0; // mBar
-	  		} else {
-	  			high_pressure = (high_pressure_voltage - 120 * 0.004 * 1000)* 250 / (120 * (0.02 - 0.004) * 1000); // Bar
-	  		}
-	  		//printf("High Pressure = %i Bar\r\n", (int) high_pressure);
+	  if (high_pressure_voltage <= 120 * 0.004 * 1000) { // Check that the ADC is not outputting 4 mA or less (sensor minimum output)
+		  high_pressure = 0; // Bar
+	  }
+	  else {
+		  high_pressure = (high_pressure_voltage - 120 * 0.004 * 1000)* 250 / (120 * (0.02 - 0.004) * 1000); // Bar
+	  }
+
+	  // Read low pressure ADC
+	  HAL_ADC_Start(&hadc1); // Start the ADC
+	  HAL_ADC_PollForConversion(&hadc1, 1); // Wait for ADC to complete conversion
+	  low_pressure_raw = HAL_ADC_GetValue(&hadc1); // Get value from ADC
+	  // Use mV instead of V to avoid using floats (because printf wouldn't let me use floats)
+	  low_pressure_voltage = (int) low_pressure_raw * 3300 / (4095); // Convert ADC reading to mV
+	  if (low_pressure_voltage <= 120 * 0.004 * 1000) { // Check that the ADC is not outputting 4 mA or less (sensor minimum output)
+		  low_pressure = 0; // mBar
+	  }
+	  else {
+		  low_pressure = ((float) low_pressure_voltage - 120 * 0.004 * 1000) * 10000 / (120 * (0.02 - 0.004) * 1000); // mBar
+	  }
 
 	  HAL_GPIO_TogglePin(GPIOB, PRS_Ready_Pin);
 	  osDelay(100);
