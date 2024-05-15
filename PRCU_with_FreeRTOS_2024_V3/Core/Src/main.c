@@ -26,6 +26,7 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -44,6 +45,10 @@
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 
+FDCAN_HandleTypeDef hfdcan1;
+
+IWDG_HandleTypeDef hiwdg;
+
 /* Definitions for task_read_senso */
 osThreadId_t task_read_sensoHandle;
 const osThreadAttr_t task_read_senso_attributes = {
@@ -58,6 +63,42 @@ const osThreadAttr_t blink02_attributes = {
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
+/* Definitions for task_default */
+osThreadId_t task_defaultHandle;
+uint32_t task_defaultBuffer[ 500 ];
+osStaticThreadDef_t task_defaultControlBlock;
+const osThreadAttr_t task_default_attributes = {
+  .name = "task_default",
+  .stack_mem = &task_defaultBuffer[0],
+  .stack_size = sizeof(task_defaultBuffer),
+  .cb_mem = &task_defaultControlBlock,
+  .cb_size = sizeof(task_defaultControlBlock),
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for task_safety */
+osThreadId_t task_safetyHandle;
+uint32_t task_safetyBuffer[ 2000 ];
+osStaticThreadDef_t task_safetyControlBlock;
+const osThreadAttr_t task_safety_attributes = {
+  .name = "task_safety",
+  .stack_mem = &task_safetyBuffer[0],
+  .stack_size = sizeof(task_safetyBuffer),
+  .cb_mem = &task_safetyControlBlock,
+  .cb_size = sizeof(task_safetyControlBlock),
+  .priority = (osPriority_t) osPriorityRealtime,
+};
+/* Definitions for task_network */
+osThreadId_t task_networkHandle;
+uint32_t task_networkBuffer[ 2000 ];
+osStaticThreadDef_t task_networkControlBlock;
+const osThreadAttr_t task_network_attributes = {
+  .name = "task_network",
+  .stack_mem = &task_networkBuffer[0],
+  .stack_size = sizeof(task_networkBuffer),
+  .cb_mem = &task_networkControlBlock,
+  .cb_size = sizeof(task_networkControlBlock),
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
 /* USER CODE BEGIN PV */
 
 // Define ADC variables
@@ -71,8 +112,13 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
+static void MX_FDCAN1_Init(void);
+static void MX_IWDG_Init(void);
 void Start_task_read_sensors(void *argument);
 void StartBlink02(void *argument);
+extern void task_default_start(void *argument);
+extern void task_safety_start(void *argument);
+extern void task_network_start(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -115,6 +161,8 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
+  MX_FDCAN1_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
   // Calibrate ADCs
@@ -148,6 +196,15 @@ int main(void)
 
   /* creation of blink02 */
   blink02Handle = osThreadNew(StartBlink02, NULL, &blink02_attributes);
+
+  /* creation of task_default */
+  task_defaultHandle = osThreadNew(task_default_start, NULL, &task_default_attributes);
+
+  /* creation of task_safety */
+  task_safetyHandle = osThreadNew(task_safety_start, NULL, &task_safety_attributes);
+
+  /* creation of task_network */
+  task_networkHandle = osThreadNew(task_network_start, NULL, &task_network_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -189,9 +246,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV4;
@@ -343,6 +401,78 @@ static void MX_ADC2_Init(void)
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
+
+}
+
+/**
+  * @brief FDCAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_FDCAN1_Init(void)
+{
+
+  /* USER CODE BEGIN FDCAN1_Init 0 */
+
+  /* USER CODE END FDCAN1_Init 0 */
+
+  /* USER CODE BEGIN FDCAN1_Init 1 */
+
+  /* USER CODE END FDCAN1_Init 1 */
+  hfdcan1.Instance = FDCAN1;
+  hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
+  hfdcan1.Init.FrameFormat = FDCAN_FRAME_FD_NO_BRS;
+  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan1.Init.AutoRetransmission = DISABLE;
+  hfdcan1.Init.TransmitPause = DISABLE;
+  hfdcan1.Init.ProtocolException = DISABLE;
+  hfdcan1.Init.NominalPrescaler = 3;
+  hfdcan1.Init.NominalSyncJumpWidth = 29;
+  hfdcan1.Init.NominalTimeSeg1 = 40;
+  hfdcan1.Init.NominalTimeSeg2 = 9;
+  hfdcan1.Init.DataPrescaler = 1;
+  hfdcan1.Init.DataSyncJumpWidth = 1;
+  hfdcan1.Init.DataTimeSeg1 = 1;
+  hfdcan1.Init.DataTimeSeg2 = 1;
+  hfdcan1.Init.StdFiltersNbr = 3;
+  hfdcan1.Init.ExtFiltersNbr = 1;
+  hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+  if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN FDCAN1_Init 2 */
+
+  /* USER CODE END FDCAN1_Init 2 */
+
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
+  hiwdg.Init.Window = 4095;
+  hiwdg.Init.Reload = 4000;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
 
 }
 
