@@ -1,0 +1,56 @@
+{
+    "configurations": [
+        {
+            "name": "CMake Debug",
+            "compileCommands": "${workspaceFolder}/build-Debug/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        },
+        {
+            "name": "CMake Release",
+            "compileCommands": "${workspaceFolder}/build-Release/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        },
+        {
+            /* This configuration is essentially the same as "CMake Debug",
+                but settings are done manually to speed up intellisense.
+                It is not guaranteed that these settings are exactly the same
+                as the "CMake Debug", as they are not automatically updated. */
+            "name": "Debug",
+            "includePath": [
+                "src/Extern/**",
+                "src/Drivers/**",
+                "src/Middlewares/Third_Party/FatFs/**",
+                "src/Middlewares/Third_Party/FreeRTOS/**",
+                "src/Middlewares/Third_Party/FTP/**",
+                "src/Middlewares/Third_Party/LwIP/**",
+                "src/Middlewares/Third_Party/MRRB/**",
+                "src/Middlewares/Third_Party/TraceRecorder/config",
+                "src/Middlewares/Third_Party/TraceRecorder/include",
+                "src/Middlewares/Third_Party/TraceRecorder/kernelports/FreeRTOS",
+                "src/Middlewares/Third_Party/TraceRecorder/streamports/Jlink_RTT",
+                "src",
+                "src/Core/**",
+                "src/Swissloop/**",
+                "src/FATFS/**",
+                "src/LWIP/**",
+                "/Applications/ARM/arm-none-eabi/include"
+            ],
+            "defines": [
+                "USE_HAL_DRIVER",
+                "USE_FULL_LL_DRIVER",
+                "LWIP_DEBUG",
+                "DEBUG",
+                "ARM_MATH_CM7",
+                "ARM_MATH_MATRIX_CHECK",
+                "ARM_MATH_ROUNDING",
+                "STM32G431xx", //"STM32H723xx",
+                "__CC_ARM"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "compilerPath": "/Applications/ARM/bin/arm-none-eabi-g++",
+            "compilerArgs": ["-Wall", "-Wextra", "-pedantic", "-Wimplicit-fallthrough", "-Og", "-g3", "-ggdb"]
+        }
+    ],
+    "version": 4
+}

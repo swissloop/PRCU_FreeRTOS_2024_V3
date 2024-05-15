@@ -15,6 +15,7 @@
 
 // Includes global configuration and all necessary files
 #include "../Inc/Project.hpp"
+#include <stdint.h>
 
 // State machine
 #include "state_machine.hpp"

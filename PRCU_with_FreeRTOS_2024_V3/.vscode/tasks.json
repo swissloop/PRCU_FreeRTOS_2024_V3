@@ -1,0 +1,39 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cmake",
+			"label": "CMake: build",
+			"command": "build",
+			"targets": [
+				"all"
+			],
+			"group": "build",
+			"problemMatcher": [],
+			"detail": "CMake template build task",
+			"dependsOn": [
+				"CMake: configure",
+			]
+		},
+		{
+			"label": "Upload ST-Link",
+			"type": "shell",
+			"command": [
+				"openocd",
+				"-f ${workspaceFolder}/docs/Debugging/OpenOCD/stm32g4x.cfg", //stm32h7x.cfg",
+				"-c \"program ${workspaceFolder}/build-${command:cmake.buildType}/GPPCBv3.elf verify exit\"",
+			],
+			"dependsOn": "CMake: build"
+		},
+		{
+			"label": "Upload",
+			"type": "shell",
+			"command": [
+				"openocd",
+				"-f ${workspaceFolder}/docs/Debugging/OpenOCD/ControlBoard.cfg",
+				"-c \"program ${workspaceFolder}/build-${command:cmake.buildType}/GPPCBv3.elf verify exit\"",
+			],
+			"dependsOn": "CMake: build"
+		},
+	]
+}
