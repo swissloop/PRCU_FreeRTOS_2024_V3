@@ -14,7 +14,7 @@
 /* Includes ------------------------------------------------------------------*/
 
 // Includes global configuration and all necessary files
-#include "Project.hpp"
+#include "../Inc/Project.hpp"
 
 // State machine
 #include "state_machine.hpp"

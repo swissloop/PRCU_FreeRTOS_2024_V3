@@ -15,7 +15,7 @@
 /* Includes ------------------------------------------------------------------*/
 
 /* Other libraries */
-#include "magic_enum/magic_enum.hpp"
+#include "../../Extern/magic_enum/magic_enum.hpp" //"magic_enum/magic_enum.hpp"
 using namespace magic_enum::bitwise_operators;
 
 /* Exported constants --------------------------------------------------------*/
