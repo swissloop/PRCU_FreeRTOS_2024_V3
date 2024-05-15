@@ -17,7 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "../Inc/main.h"
+#include "main.h"
 #include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -44,7 +44,9 @@
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 
-/* Definitions for task_read_sensor */
+SPI_HandleTypeDef hspi2;
+
+/* Definitions for task_read_senso */
 osThreadId_t task_read_sensoHandle;
 const osThreadAttr_t task_read_senso_attributes = {
   .name = "task_read_senso",
@@ -64,6 +66,28 @@ const osThreadAttr_t blink02_attributes = {
 int high_pressure; // high pressure sensor reading (Bar)
 int low_pressure; // low pressure sensor reading (mBar)
 
+// Define pod pressure variables
+float pod_pressure; // pod pressure (Bar)
+const float offs_p = -545.6; // Transfer function parameter (see page 8 of KP264 data sheet) (LSB/kPa)
+const float S_p = 13.64; // Transfer function parameter (see page 8 of KP264 data sheet) (LSB)
+
+// Define pod pressure sensor (KP264 on PCB) commands
+// The reset bit for all commands is currently set to 0 (see page 17 of KP264 data sheet)
+const uint16_t request_pressure = 0b0010000000000000;
+const uint16_t request_temperature = 0b0100000000000000;
+const uint16_t request_diagnosis = 0b1000000000000000;
+const uint16_t request_identifier = 0b1110000000000000;
+
+// Define pod pressure sensor (KP264 on PCB) bit masks
+const uint16_t data_mask = 0b0000011111111110;
+const uint16_t com_error_mask = 0b0000000000000001;
+const uint16_t FEC_error_mask = 0b1000000000000000;
+const uint16_t Diag1_mask = 0b0100000000000000;
+const uint16_t Diag2_mask = 0b0010000000000000;
+const uint16_t pressure_over_max_mask = 0b0001000000000000;
+const uint16_t pressure_under_min_mask = 0b0000100000000000;
+const uint16_t no_error_mask = 0b0101000000000000;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,6 +95,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
+static void MX_SPI2_Init(void);
 void Start_task_read_sensors(void *argument);
 void StartBlink02(void *argument);
 
@@ -123,11 +148,15 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
 
   // Calibrate ADCs
   HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED); // Calibrates ADC for low pressure sensor
   HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED); // Calibrates ADC for high pressure sensor
+
+  // Pull SPI chip select line high
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
 
   /* USER CODE END 2 */
 
@@ -355,6 +384,46 @@ static void MX_ADC2_Init(void)
 }
 
 /**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_16BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 7;
+  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -416,7 +485,10 @@ void Start_task_read_sensors(void *argument)
 	  uint16_t low_pressure_raw; // Low pressure ADC raw data (0 to 4095)
 	  int low_pressure_voltage; // Low pressure ADC voltage reading (0 to VREF)
 
-	  // Read high pressure ADC
+	  // Define pod pressure sensor (KP264 on PCB) variables
+	  uint16_t SPI_buffer; // Buffer to hold SPI data from pod pressure sensor
+
+	  // BEGIN Read high pressure ADC ----------------------------------------------------------------------------------------------
 	  HAL_ADC_Start(&hadc2); // Start the ADC
 	  HAL_ADC_PollForConversion(&hadc2, 1); // Wait for ADC to complete conversion
 	  high_pressure_raw = HAL_ADC_GetValue(&hadc2); // Get value from ADC
@@ -428,8 +500,9 @@ void Start_task_read_sensors(void *argument)
 	  else {
 		  high_pressure = (high_pressure_voltage - 120 * 0.004 * 1000)* 250 / (120 * (0.02 - 0.004) * 1000); // Bar
 	  }
+	  // END Read high pressure ADC ------------------------------------------------------------------------------------------------
 
-	  // Read low pressure ADC
+	  // BEGIN Read low pressure ADC -----------------------------------------------------------------------------------------------
 	  HAL_ADC_Start(&hadc1); // Start the ADC
 	  HAL_ADC_PollForConversion(&hadc1, 1); // Wait for ADC to complete conversion
 	  low_pressure_raw = HAL_ADC_GetValue(&hadc1); // Get value from ADC
@@ -441,6 +514,23 @@ void Start_task_read_sensors(void *argument)
 	  else {
 		  low_pressure = ((float) low_pressure_voltage - 120 * 0.004 * 1000) * 10000 / (120 * (0.02 - 0.004) * 1000); // mBar
 	  }
+	  // END Read low pressure ADC -------------------------------------------------------------------------------------------------
+
+	  // BEGIN Read pod pressure sensor (KP264 on PCB) -----------------------------------------------------------------------------
+	  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET); // Pull SPI chip select line low to begin communication
+	  if (HAL_SPI_TransmitReceive(&hspi2, (uint8_t*) &request_pressure, (uint8_t*) &SPI_buffer, 1, 100) != HAL_OK) {
+		  pod_pressure = 111;
+	  }
+	  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET); // Pull SPI chip select line high to end communication
+	  // Check if no errors were detected
+	  if ((SPI_buffer & no_error_mask) == no_error_mask) {
+		  // Get the pressure data using a bit mask and right shift operator to get rid of parity bit
+		  SPI_buffer = (SPI_buffer & data_mask) >> 1;
+		  // Convert pressure from LSB to Bar using transfer function from data sheet
+		  pod_pressure = ((float)SPI_buffer - offs_p)/S_p; // Bar
+	  }
+	  // END Read pod pressure sensor (KP264 on PCB) -------------------------------------------------------------------------------
+
 
 	  HAL_GPIO_TogglePin(GPIOB, PRS_Ready_Pin);
 	  osDelay(100);
