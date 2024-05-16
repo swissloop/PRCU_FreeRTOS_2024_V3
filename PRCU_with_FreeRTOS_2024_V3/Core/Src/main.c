@@ -53,11 +53,18 @@ const osThreadAttr_t task_read_senso_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
-/* Definitions for blink02 */
-osThreadId_t blink02Handle;
-const osThreadAttr_t blink02_attributes = {
-  .name = "blink02",
-  .priority = (osPriority_t) osPriorityLow,
+/* Definitions for task_LED_Blink */
+osThreadId_t task_LED_BlinkHandle;
+const osThreadAttr_t task_LED_Blink_attributes = {
+  .name = "task_LED_Blink",
+  .priority = (osPriority_t) osPriorityBelowNormal,
+  .stack_size = 128 * 4
+};
+/* Definitions for task_safety */
+osThreadId_t task_safetyHandle;
+const osThreadAttr_t task_safety_attributes = {
+  .name = "task_safety",
+  .priority = (osPriority_t) osPriorityAboveNormal,
   .stack_size = 128 * 4
 };
 /* USER CODE BEGIN PV */
@@ -88,6 +95,11 @@ const uint16_t pressure_over_max_mask = 0b0001000000000000;
 const uint16_t pressure_under_min_mask = 0b0000100000000000;
 const uint16_t no_error_mask = 0b0101000000000000;
 
+// Define state machine variables
+enum state{Reset, Idle, Active, Emergency}; // Possible states that state machine can be in
+enum state next_state = Reset; // Places the PRCU in Reset upon startup
+enum state current_state;	// Initialize current_state variable
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,7 +109,8 @@ static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_SPI2_Init(void);
 void Start_task_read_sensors(void *argument);
-void StartBlink02(void *argument);
+void Start_task_LED_Blink(void *argument);
+void Start_task_safety(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -183,8 +196,11 @@ int main(void)
   /* creation of task_read_senso */
   task_read_sensoHandle = osThreadNew(Start_task_read_sensors, NULL, &task_read_senso_attributes);
 
-  /* creation of blink02 */
-  blink02Handle = osThreadNew(StartBlink02, NULL, &blink02_attributes);
+  /* creation of task_LED_Blink */
+  task_LED_BlinkHandle = osThreadNew(Start_task_LED_Blink, NULL, &task_LED_Blink_attributes);
+
+  /* creation of task_safety */
+  task_safetyHandle = osThreadNew(Start_task_safety, NULL, &task_safety_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -538,34 +554,90 @@ void Start_task_read_sensors(void *argument)
 	  }
 	  // END Read pod pressure sensor (KP264 on PCB) -------------------------------------------------------------------------------
 
-
-	  HAL_GPIO_TogglePin(GPIOB, PRS_Ready_Pin);
-	  osDelay(100);
-	  HAL_GPIO_TogglePin(GPIOB, PRS_Ready_Pin);
-	  osDelay(100);
+	  osDelay(100); // Put task to sleep so that other tasks can run
   }
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartBlink02 */
+/* USER CODE BEGIN Header_Start_task_LED_Blink */
 /**
-* @brief Function implementing the blink02 thread.
+* @brief Function implementing the task_LED_Blink thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartBlink02 */
-void StartBlink02(void *argument)
+/* USER CODE END Header_Start_task_LED_Blink */
+void Start_task_LED_Blink(void *argument)
 {
-  /* USER CODE BEGIN StartBlink02 */
+  /* USER CODE BEGIN Start_task_LED_Blink */
   /* Infinite loop */
   for(;;)
   {
-	  HAL_GPIO_TogglePin(Valve_Enable_GPIO_Port, Valve_Enable_Pin);
-	  osDelay(100);
-	  HAL_GPIO_TogglePin(Valve_Enable_GPIO_Port, Valve_Enable_Pin);
-	  osDelay(100);
+		switch (current_state) {
+		case Reset:
+			// PRS LED always off when in Reset state
+			HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin, RESET);
+			osDelay(100);
+			break;
+		case Idle:
+			// PRS LED slow blink when in Idle state
+			HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin, SET);
+			osDelay(500);
+			HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin, RESET);
+			osDelay(500);
+			break;
+		case Active:
+			// PRS LED always on when in Active state
+			HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin, SET);
+			osDelay(100);
+			break;
+		case Emergency:
+			// PRS LED fast blink when in Emergency state
+			HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin, SET);
+			osDelay(100);
+			HAL_GPIO_WritePin(GPIOB, PRS_Ready_Pin, RESET);
+			osDelay(100);
+			break;
+		}
+
+		HAL_GPIO_WritePin(Valve_Enable_GPIO_Port, Valve_Enable_Pin, SET);
+		osDelay(100);
+		HAL_GPIO_WritePin(Valve_Enable_GPIO_Port, Valve_Enable_Pin, RESET);
+		osDelay(100);
   }
-  /* USER CODE END StartBlink02 */
+  /* USER CODE END Start_task_LED_Blink */
+}
+
+/* USER CODE BEGIN Header_Start_task_safety */
+/**
+* @brief Function implementing the task_safety thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_Start_task_safety */
+void Start_task_safety(void *argument)
+{
+  /* USER CODE BEGIN Start_task_safety */
+  /* Infinite loop */
+  for(;;)
+  {
+		switch (next_state) {
+		case Reset:
+			current_state = Reset;
+			break;
+		case Idle:
+			current_state = Idle;
+			break;
+		case Active:
+			current_state = Active;
+			break;
+		case Emergency:
+			current_state = Emergency;
+			break;
+		}
+
+		osDelay(100); // put task to sleep so that other tasks can run
+  }
+  /* USER CODE END Start_task_safety */
 }
 
 /**
