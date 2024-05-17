@@ -97,6 +97,7 @@ const uint16_t no_error_mask = 0b0101000000000000;
 
 // Define state machine variables
 enum state{Reset, Idle, Active, Emergency}; // Possible states that state machine can be in
+//USE NUMBERS FROM BIANCA FOR RESET, IDLE ACTIVE AND EMERGENCY!!!!!!!!!!!!!!!
 enum state next_state = Reset; // Places the PRCU in Reset upon startup
 enum state current_state;	// Initialize current_state variable
 
